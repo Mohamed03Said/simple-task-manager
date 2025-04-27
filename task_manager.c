@@ -11,6 +11,7 @@ void getChoice(int *choice) {
     getchar();
 }
 
+
 void displayTasksMenu() {
     printf("\nSelect a task to start:\n");
     printf("1. Ping google.com\n");
@@ -85,4 +86,17 @@ void startTask() {
     }
 }
 
+
+void listTasks() {
+    if (taskCount == 0) {
+        printf("No tasks are currently running.\n");
+        return;
+    }
+
+    printf("\n---- List of Running Tasks ----\n");
+    for (int i = 0; i < taskCount; i++) {
+        printf("Task %d: PID %d, Command: %s\n", i + 1, tasks[i].pid, tasks[i].command);
+    }
+    printf("\n");
+}
 

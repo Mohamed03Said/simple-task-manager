@@ -86,17 +86,54 @@ void startTask() {
     }
 }
 
-
-void listTasks() {
+void runningTasks(){
     if (taskCount == 0) {
         printf("No tasks are currently running.\n");
         return;
     }
-
-    printf("\n---- List of Running Tasks ----\n");
-    for (int i = 0; i < taskCount; i++) {
+  for (int i = 0; i < taskCount; i++) {
         printf("Task %d: PID %d, Command: %s\n", i + 1, tasks[i].pid, tasks[i].command);
     }
     printf("\n");
+}
+
+void listTasks() {
+    if(taskCount > 0){
+      printf("\n---- List of Running Tasks ----\n");
+    }
+    runningTasks();
+}
+
+void stopTask() {
+    if(taskCount == 0){
+      printf("No running tasks to stop.\n");
+    }
+    
+    runningTasks();
+    
+    int choice = -1;
+
+    printf("Enter the task number to stop: ");
+    scanf("%d", &choice);
+    getchar();
+
+    if (choice < 1 || choice > taskCount) {
+        printf("No Task with this number.");
+        return;
+    }
+
+    pid_t pid = tasks[choice - 1].pid;
+
+    if (kill(pid, SIGTERM) == 0) {
+        printf("Task with PID= %d stopped successfully.\n", pid);
+
+        for (int i = choice - 1; i < taskCount - 1; i++) {//remove form the list
+            tasks[i] = tasks[i + 1];
+        }
+        taskCount--;
+    } 
+    else {
+        perror("Failed to stop task");
+    }
 }
 

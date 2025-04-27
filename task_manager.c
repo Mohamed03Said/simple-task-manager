@@ -1,4 +1,4 @@
-#inclue "task_manager.h"
+#include "task_manager.h"
 
 
 Task tasks[MAX_TASKS];
@@ -81,6 +81,8 @@ void startTask() {
                     break;
             }
             taskCount++;
+            int status;
+            waitpid(pid, &status, 0);
             printf("Started task with PID %d\n", pid);
         }
     }
@@ -134,6 +136,65 @@ void stopTask() {
     } 
     else {
         perror("Failed to stop task");
+    }
+}
+
+
+void exitProgram() {
+    printf("\nTerminating all running tasks...\n");
+
+    for (int i = 0; i < taskCount; i++) {
+        pid_t pid = tasks[i].pid;
+
+        if (kill(pid, SIGTERM) == 0) {
+            printf("Sent SIGTERM to task with PID %d\n", pid);
+        } else {
+            perror("Failed to send SIGTERM");
+        }
+
+        int status;
+        if (waitpid(pid, &status, 0) == -1) {
+            perror("Error waiting for child process");
+        } 
+        else {
+            if (WIFEXITED(status)) {
+                printf("Task with PID %d exited with status %d\n", pid, WEXITSTATUS(status));
+            } 
+            else if (WIFSIGNALED(status)) {
+                printf("Task with PID %d terminated by signal %d\n", pid, WTERMSIG(status));
+            }
+        }
+    }
+    
+    taskCount = 0;
+    printf("All tasks terminated and cleaned up. Exiting program...\n");
+    exit(0);
+}
+
+void checkZombies() {
+    for (int i = 0; i < taskCount; i++) {
+        pid_t pid = tasks[i].pid;
+        int status;
+
+        pid_t result = waitpid(pid, &status, WNOHANG); //prevents blocking in the parent process
+
+        if (result == -1) {
+            perror("Error in waitpid");
+        } 
+        else if (result > 0) { // Child process has terminated
+            if (WIFEXITED(status)) {
+                printf("Task with PID %d finished with exit status %d\n", pid, WEXITSTATUS(status));
+            } 
+            else if (WIFSIGNALED(status)) {
+                printf("Task with PID %d terminated by signal %d\n", pid, WTERMSIG(status));
+            }
+            
+            for (int j = i; j < taskCount - 1; j++) {
+                tasks[j] = tasks[j + 1];
+            }
+            taskCount--;
+            i--;
+        }
     }
 }
 

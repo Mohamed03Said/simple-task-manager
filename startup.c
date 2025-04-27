@@ -1,30 +1,10 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/wait.h>
-#include <signal.h>
-#include <string.h>
-
-#define MAX_TASKS 10  // Maximum allowed tasks
-
-typedef struct {
-    pid_t pid;
-    char command[256];  
-} Task;
-
-Task tasks[MAX_TASKS];  // Store running tasks
-int taskCount = 0; 
-
-void startTask();
-void listTasks();
-void stopTask();
-void exitProgram();
-void checkZombies();
+#include "task_manager.h"
 
 int main() {
-    int choice;
-    
-    while (1) {
+    int choice = -1;
+
+    while (choice != 4) {
         checkZombies();  // Cleanup terminated tasks
 
         printf("\n----Task Manager----\n");
@@ -37,33 +17,22 @@ int main() {
         getchar();
 
         switch (choice) {
-            case 1: startTask(); break;
-            case 2: listTasks(); break;
-            case 3: stopTask(); break;
-            case 4: exitProgram(); break;
-            default: printf("Invalid choice. Try again.\n");
+            case 1: 
+              startTask(); 
+              break;
+            case 2: 
+              listTasks(); 
+              break;
+            case 3: 
+              stopTask(); 
+              break;
+            case 4: 
+              exitProgram(); 
+              break;
+            default: 
+              printf("Invalid choice.\n");
+              break;
         }
     }
 }
 
-void startTask() {
-		printf("TODO Start Task");
-}
-
-void listTasks() {
-		printf("TODO List Tasks");
-}
-
-void stopTask() {
-		printf("TODO Stop Task");
-}
-
-void exitProgram(){
-		printf("TODO Exit Program");
-		// Make sure to terminate all running childern processes before exiting
-		}
-
-void checkZombies() {
-    printf("TODO Check Zombies");
-    // Check if there are any zombie processes remove it & remove it from tasks array
- }

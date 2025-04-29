@@ -7,9 +7,11 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <string.h>
+#include <stdbool.h>
+#include <errno.h>
 
 
-#define MAX_TASKS 10
+#define MAX_TASKS 100
 
 
 typedef struct {

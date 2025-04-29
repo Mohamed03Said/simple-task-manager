@@ -5,18 +5,19 @@ Task tasks[MAX_TASKS];
 int taskCount = 0;
 
 
-void getChoice(int *choice) {
+void get_choice(int *choice) {
     printf("Enter choice number: ");
     scanf("%d", choice);
     getchar();
 }
 
 
-void displayTasksMenu() {
+void display_tasks_menu() {
     printf("\nSelect a task to start:\n");
     printf("1. Ping google.com\n");
     printf("2. Show Date\n");
     printf("3. Sleep 10 seconds\n");
+    printf("4. Display Content Of Current Directory\n");
     printf("0. Back To Main Menu\n");
 }
 
@@ -29,25 +30,17 @@ void startTask() {
     int choice = -1;
 
     while (choice != 0) {
-        displayTasksMenu();
-        getChoice(&choice);
-
-        if (choice == 0) {
-            printf("Returning to main menu...\n");
-            return;
+        display_tasks_menu();
+        get_choice(&choice);
+        if(choice == 0){
+          continue;
         }
-
-        if (choice < 0 || choice > 3) {
-            printf("Invalid choice, please try again.\n");
-            continue;
-        }
-
         pid_t pid = fork();
 
         if (pid < 0) {
             perror("Fork failed");
         } 
-        else if (pid == 0) {// Child process
+        else if (pid == 0) {  // Child process
             switch (choice) {
                 case 1:
                     execlp("ping", "ping", "-c", "4", "google.com", NULL);
@@ -58,13 +51,16 @@ void startTask() {
                 case 3:
                     execlp("sleep", "sleep", "10", NULL);
                     break;
+                case 4:
+                    execlp("ls", "ls", NULL);
+                    break;
                 default:
-                    printf("Unknown choice in child process.\n");
+                    printf("Invalid Choice.\n");
                     break;
             }
             exit(0);
         } 
-        else {
+        else {  // Parent process
             tasks[taskCount].pid = pid;
             switch (choice) {
                 case 1:
@@ -76,25 +72,30 @@ void startTask() {
                 case 3:
                     strcpy(tasks[taskCount].command, "sleep 10");
                     break;
+                case 4:
+                    strcpy(tasks[taskCount].command, "ls");
+                    break;
                 default:
                     strcpy(tasks[taskCount].command, "unknown");
                     break;
             }
             taskCount++;
+
             int status;
-            waitpid(pid, &status, 0);
+            waitpid(pid, &status, 0);  // Wait for the child to finish
             printf("Started task with PID %d\n", pid);
         }
     }
 }
 
-void runningTasks(){
+
+void running_tasks(){
     if (taskCount == 0) {
         printf("No tasks are currently running.\n");
         return;
     }
-  for (int i = 0; i < taskCount; i++) {
-        printf("Task %d: PID %d, Command: %s\n", i + 1, tasks[i].pid, tasks[i].command);
+  for (int task_number = 0; task_number < taskCount; task_number++) {
+        printf("Task %d: PID %d, Command: %s\n", task_number + 1, tasks[task_number].pid, tasks[task_number].command);
     }
     printf("\n");
 }
@@ -103,97 +104,132 @@ void listTasks() {
     if(taskCount > 0){
       printf("\n---- List of Running Tasks ----\n");
     }
-    runningTasks();
+    running_tasks();
+}
+
+bool stop_task_by_PID(pid_t pid, int signal){
+  bool is_stopped = false;
+  
+  int killResult = kill(pid, signal);
+    if (killResult == 0) {
+        printf("signal sent to PID %d.\n", pid);
+
+        int status;
+        if (waitpid(pid, &status, 0) == -1) { // wait until it terminated
+            perror("Error waiting for process");
+        } 
+        else {
+            if (WIFEXITED(status)) {
+                printf("Task exited with status %d\n", WEXITSTATUS(status));
+            } 
+            else if (WIFSIGNALED(status)) {
+                printf("Task killed by signal %d\n", WTERMSIG(status));
+            }
+        }
+        is_stopped = true;
+    }
+    else {
+        switch (errno) {
+            case ESRCH:
+                printf("Process %d already exited.\n", pid);
+                is_stopped = true;
+                break;
+            case EPERM:
+                printf("No permission to kill process %d.\n", pid);
+                break;
+            case EINVAL:
+                printf("Invalid signal passed to kill().\n");
+                break;
+            default:
+                perror("Failed to send SIGTERM");
+        }
+
+        int status;
+        if (waitpid(pid, &status, WNOHANG) > 0) { // handle it's already exited
+            printf("Process %d was already exited.\n", pid);
+            is_stopped = true;
+        }
+    }
+    
+    return is_stopped;
+}
+
+void clean_up(int *task_number){
+  for (int i = *task_number + 1; i < taskCount - 1; i++) {//remove form the list
+            tasks[i-1] = tasks[i];
+        }
+        taskCount--;
 }
 
 void stopTask() {
     if(taskCount == 0){
       printf("No running tasks to stop.\n");
+      return;
     }
     
-    runningTasks();
+    running_tasks();
     
-    int choice = -1;
+    int task_number;
 
-    printf("Enter the task number to stop: ");
-    scanf("%d", &choice);
-    getchar();
+    get_choice(&task_number);
 
-    if (choice < 1 || choice > taskCount) {
+    if (task_number < 1 || task_number > taskCount) {
         printf("No Task with this number.");
         return;
     }
 
-    pid_t pid = tasks[choice - 1].pid;
+    pid_t pid = tasks[task_number - 1].pid;
 
-    if (kill(pid, SIGTERM) == 0) {
-        printf("Task with PID= %d stopped successfully.\n", pid);
-
-        for (int i = choice - 1; i < taskCount - 1; i++) {//remove form the list
-            tasks[i] = tasks[i + 1];
-        }
-        taskCount--;
-    } 
-    else {
-        perror("Failed to stop task");
+    bool result = stop_task_by_PID(pid, SIGTERM);
+    
+    if(result){
+      printf("Task PID= %d stopped successfully.\n", pid);
+      clean_up(&task_number);
+    }
+    else{
+      printf("Failed to stop Task PID= %d stopped successfully.\n", pid);
     }
 }
-
 
 void exitProgram() {
     printf("\nTerminating all running tasks...\n");
-
-    for (int i = 0; i < taskCount; i++) {
-        pid_t pid = tasks[i].pid;
-
-        if (kill(pid, SIGTERM) == 0) {
-            printf("Sent SIGTERM to task with PID %d\n", pid);
-        } else {
-            perror("Failed to send SIGTERM");
-        }
-
-        int status;
-        if (waitpid(pid, &status, 0) == -1) {
-            perror("Error waiting for child process");
-        } 
-        else {
-            if (WIFEXITED(status)) {
-                printf("Task with PID %d exited with status %d\n", pid, WEXITSTATUS(status));
-            } 
-            else if (WIFSIGNALED(status)) {
-                printf("Task with PID %d terminated by signal %d\n", pid, WTERMSIG(status));
-            }
-        }
-    }
     
-    taskCount = 0;
-    printf("All tasks terminated and cleaned up. Exiting program...\n");
-    exit(0);
+    bool stopped_all = true;
+    for (int task_number = 0; task_number < taskCount; task_number++) {
+        pid_t pid = tasks[task_number].pid;
+        stopped_all &= stop_task_by_PID(pid, SIGTERM);
+    }
+    if(stopped_all){
+      taskCount = 0;
+      printf("All tasks terminated and cleaned up. Exiting program...\n");
+      exit(0);
+    }
+    else{
+      printf("Failed to stop all tasks\n");
+    }
 }
 
 void checkZombies() {
-    for (int i = 0; i < taskCount; i++) {
-        pid_t pid = tasks[i].pid;
+    printf("Check Zombies...\n");
+    for (int task_number = 0; task_number < taskCount; task_number++) {
+        pid_t pid = tasks[task_number].pid;
         int status;
-
-        pid_t result = waitpid(pid, &status, WNOHANG); //prevents blocking in the parent process
+        
+        pid_t result = waitpid(pid, &status, WNOHANG); // avoid blocking the parent
 
         if (result == -1) {
             perror("Error in waitpid");
         } 
-        else if (result > 0) { // Child process has terminated
+        else if (result > 0) { // child terminated
             if (WIFEXITED(status)) {
-                printf("Task with PID %d finished with exit status %d\n", pid, WEXITSTATUS(status));
+                printf("Task PID %d exited with status %d\n", pid, WEXITSTATUS(status));
             } 
             else if (WIFSIGNALED(status)) {
-                printf("Task with PID %d terminated by signal %d\n", pid, WTERMSIG(status));
+                printf("Task PID %d terminated by signal %d\n", pid, WTERMSIG(status));
             }
-            
-            for (int j = i; j < taskCount - 1; j++) {
-                tasks[j] = tasks[j + 1];
-            }
-            taskCount--;
-            i--;
+
+            clean_up(&task_number);
+            task_number--;
         }
     }
 }
